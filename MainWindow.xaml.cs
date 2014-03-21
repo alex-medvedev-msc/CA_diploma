@@ -39,7 +39,11 @@ namespace PractiseVisualizer
                 RowCount=5,
                 RoadLength=100,
                 MaxAcceleration=2,
-                MaxSpeed = 11
+                MaxSpeed = 11,
+                GreenInterval = 15,
+                RedInterval = 8,
+                GreenIntervalAtEnd = 15,
+                RedIntervalAtEnd = 20
             };
             automator.Init();
             var model = new PlotModel();
@@ -54,7 +58,7 @@ namespace PractiseVisualizer
         int iterations = 0;
         void timer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if (iterations == 15)
+            if (iterations == 30)
                 ((Timer)sender).Stop();
             automator.Iterate();
             Dispatcher.Invoke(() =>
@@ -79,24 +83,29 @@ namespace PractiseVisualizer
                     if (cells[i, j].Type != AutoType.None)
                     {
                         var item = new RectangleBarItem(j, i, j + 1, i + 1);
-                        if (cells[i, j].Type == AutoType.Bus)
+                        switch (cells[i, j].Type)
                         {
-                            item.Color = OxyColors.LightYellow;
-                            if (cells[i, j].isFirst)
-                                item.Color = OxyColors.Yellow;
-                        }
-                        else
-                        {
-                            if (cells[i, j].isFirst)
-                            {
-                                item.Color = OxyColors.LightBlue;
-                            }
-                            else
-                            {
-                                item.Color = OxyColors.LightCyan;
-                            }
-                            
-                        }
+                            case AutoType.Bus:
+                                item.Color = OxyColors.LightYellow;
+                                    if (cells[i, j].isFirst)
+                                        item.Color = OxyColors.Yellow;
+                                break;
+                            case AutoType.Car:
+                                if (cells[i, j].isFirst)
+                                {
+                                    item.Color = OxyColors.LightBlue;
+                                }
+                                else
+                                {
+                                    item.Color = OxyColors.LightCyan;
+                                }
+                                break;
+                            case AutoType.Trouble:
+                                item.Color = OxyColors.Red;
+                                break;
+                            default:
+                                break; 
+                        }                        
                         series.Items.Add(item);
                     }
                 }
