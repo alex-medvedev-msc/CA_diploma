@@ -82,11 +82,15 @@ namespace PractiseVisualizer
         }
         int addedMen;
         int removedMen;
+        int carsFlow;
         public double GetMenFlow()
         {            
             return removedMen;
         }
-
+        public int GetAutoFlow()
+        {
+            return carsFlow;
+        }
         #endregion
 
 
@@ -113,6 +117,7 @@ namespace PractiseVisualizer
             removedMen = 0;
             FillFirstColumn();
             changedRowCount = 0;
+            carsFlow=0;
             for (int i = 0; i < RowCount; i++)
             {
                 for (int j = RoadLength-1; j >=0; j--)
@@ -126,6 +131,7 @@ namespace PractiseVisualizer
                     if (j + mRoad[i, j].Speed >= RoadLength)
                     {
                         removedMen += mRoad[i, j].ManCount;
+                        carsFlow++;
                         continue;
                     }
                     var forwardAutoIndex = SearchForwardAuto(mRoad,i, j);

@@ -40,12 +40,12 @@ namespace PractiseVisualizer
                 BusQuota=0.2,
                 BusLength=12,
                 CarLength=5,
-                RowCount=5,
+                RowCount=4,
                 RoadLength=400,
                 MaxAcceleration=2,
                 MaxSpeed = 11,
                 GreenInterval = 100,
-                RedInterval = 0,
+                RedInterval = 20,
                 GreenIntervalAtEnd = 50,
                 RedIntervalAtEnd = 20,
                 ChangeRowProbability = 1,
@@ -74,9 +74,9 @@ namespace PractiseVisualizer
             var model = new PlotModel();
             Road.Model = model;
             //PlotRowChanges();
-            PlotManFlow();
-            //PlotSpeedAndDensity();
-            WriteToPngFile("man flow.png");
+            //PlotManFlow();
+            PlotSpeedAndDensity();
+            WriteToPngFile("speed and density_4 rows.png");
             //PlotSpeed();
             //PlotDensity();
             /*
@@ -113,6 +113,12 @@ namespace PractiseVisualizer
             iterations++;
         }
 
+
+        void PlotFundamentalDiagram()
+        {
+
+        }
+        const int MAX_ITERATIONS = 100;
         void PlotManFlow()
         {
             var points = new LineSeries("Man Flow");
@@ -120,21 +126,20 @@ namespace PractiseVisualizer
             {
                 automators[i].BusQuota = (double)i / automators.Count;
             }
-            for (int i = 0; i < 200; i++)
-            {
-                var mens = new List<double>();
-                foreach (var ar in automators)
+            var manFlowList = new double[automators.Count];
+            for (int ai = 0; ai < automators.Count; ai++)
+            {                
+                for (int i = 0; i < MAX_ITERATIONS; i++)
                 {
-                    ar.Iterate();
-                    if (i < 20)
-                        continue;
-                    mens.Add(ar.GetMenFlow());
-                }                
-                if (i > 20)
-                {
-                    points.Points.Add(new DataPoint(i, mens.Average()));                  
+                    automators[ai].Iterate();
+                    manFlowList[ai] += automators[ai].GetMenFlow();
                 }                
             }
+            for (int i = 0; i < manFlowList.Length; i++)
+            {
+                points.Points.Add(new DataPoint((double)i / manFlowList.Length, manFlowList[i] / MAX_ITERATIONS));
+            }
+            
             Road.Model.Series.Add(points);
             Road.Model.RefreshPlot(true);  
         }
