@@ -11,6 +11,7 @@ namespace PractiseVisualizer
         public AutoType Type { get; set; }
         public int Speed { get; set; }
         public bool isFirst { get; set; }
+        public int ManCount { get; set; }
     }
     public enum AutoType
     {

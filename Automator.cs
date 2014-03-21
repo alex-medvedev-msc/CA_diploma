@@ -42,6 +42,54 @@ namespace PractiseVisualizer
         int timeStep;
         int intervalDuration;
         int intervalDurationAtEnd;
+
+        #region Statistics
+        public double GetDensity()
+        {
+            var autoCount = 0;
+            foreach (var c in mRoad)
+            {
+                if (c.Type == AutoType.Car || c.Type == AutoType.Bus)
+                    autoCount++;
+            }
+            return ((double)autoCount) / (RowCount * RoadLength);
+        }
+
+        public double GetAverageSpeed()
+        {
+            var autoCount = 0;
+            double speed = 0;
+            foreach (var c in mRoad)
+            {
+                if (c.isFirst)
+                {
+                    autoCount++;
+                    speed += c.Speed;
+                }
+            }
+            return speed / autoCount; 
+        }
+
+        public double GetChangedRowPart()
+        {
+            var autoCount = 0;
+            foreach (var c in mRoad)
+            {
+                if (c.isFirst)
+                    autoCount++;
+            }
+            return (double)changedRowCount / autoCount;
+        }
+        int addedMen;
+        int removedMen;
+        public double GetMenFlow()
+        {            
+            return removedMen;
+        }
+
+        #endregion
+
+
         public void Init()
         {
             mRoad = new Cell[RowCount, RoadLength];
@@ -60,22 +108,30 @@ namespace PractiseVisualizer
             random = new Random();            
         }
         public void Iterate()
-        {            
+        {
+            addedMen = 0;
+            removedMen = 0;
             FillFirstColumn();
+            changedRowCount = 0;
             for (int i = 0; i < RowCount; i++)
             {
                 for (int j = RoadLength-1; j >=0; j--)
                 {
                     if (mRoad[i, j].Type == AutoType.Trouble)
                         mRoad2[i, j].Type = AutoType.Trouble;
-                    if (!mRoad[i, j].isFirst || j + mRoad[i,j].Speed >= RoadLength)
+                    if (!mRoad[i, j].isFirst)
                     {
                         continue; 
                     }
-                    var forwardAutoIndex = SearchForwardAuto(i, j);
+                    if (j + mRoad[i, j].Speed >= RoadLength)
+                    {
+                        removedMen += mRoad[i, j].ManCount;
+                        continue;
+                    }
+                    var forwardAutoIndex = SearchForwardAuto(mRoad,i, j);
                     int speed = SanitizeSpeed(i, j, forwardAutoIndex);
-                    var forwardAutoIndexLeft = 1; 
-                    var backAutoIndexLeft = 1;
+                    var forwardAutoIndexLeft = j+1; 
+                    var backAutoIndexLeft = j-1;
                     int speedLeft = 0;
                     int speedRight = 0;
                     int backSpeedLeft = 0;
@@ -83,38 +139,68 @@ namespace PractiseVisualizer
                     bool canMoveLeft = false;
                     if (i > 0)
                     {
-                        forwardAutoIndexLeft = SearchForwardAuto(i - 1, j);
-                        backAutoIndexLeft = SearchBackAuto(i - 1, j);
-                        
-                            speedLeft = SanitizeSpeed(i - 1, j, forwardAutoIndexLeft);
-                        
-                            backSpeedLeft = SanitizeSpeed(i - 1, backAutoIndexLeft, j);
-                        
+                        forwardAutoIndexLeft = SearchForwardAuto(mRoad,i - 1, j);
+                        var shadowIndex = SearchForwardAuto(mRoad2, i - 1, j);                        
+                        backAutoIndexLeft = SearchBackAuto(mRoad,i - 1, j);
+                        var backShadowIndex = SearchBackAuto(mRoad2, i - 1, j);
+                        speedLeft = SanitizeSpeed(i - 1, j, forwardAutoIndexLeft);                        
+                        backSpeedLeft = SanitizeSpeed(i - 1, backAutoIndexLeft, j);
+                        if ((shadowIndex == -1 || shadowIndex >=forwardAutoIndexLeft) &&
+                            backShadowIndex <= backAutoIndexLeft &&
+                            (backAutoIndexLeft == -1 || mRoad[i - 1, backAutoIndexLeft].Speed - MaxAcceleration < backSpeedLeft)  &&
+                            speedLeft >= speed)
+                        {
+                            canMoveLeft = true;
+                        }
                     }
-                    var forwardAutoIndexRight = 1;
-                    var backAutoIndexRight = 1;
+                    var forwardAutoIndexRight = j+1;
+                    var backAutoIndexRight = j-1;
                     bool canMoveRight = false;
                     if (i < RowCount - 1)
                     {
-                        forwardAutoIndexRight = SearchForwardAuto(i + 1, j);
-                        backAutoIndexRight = SearchBackAuto(i + 1, j);
-                        
-                            speedRight = SanitizeSpeed(i + 1, j, forwardAutoIndexRight);
-                        
-                            backSpeedRight = SanitizeSpeed(i + 1, backAutoIndexRight, j);
+                        forwardAutoIndexRight = SearchForwardAuto(mRoad,i + 1, j);
+                        var shadowIndex = SearchForwardAuto(mRoad2, i + 1, j);
+                        if (shadowIndex == -1)
+                            shadowIndex = forwardAutoIndexRight;
+                        backAutoIndexRight = SearchBackAuto(mRoad,i + 1, j);
+                        var backShadowIndex = SearchBackAuto(mRoad2, i + 1, j);
+                        speedRight = SanitizeSpeed(i + 1, j, forwardAutoIndexRight);                        
+                        backSpeedRight = SanitizeSpeed(i + 1, backAutoIndexRight, j);
+                        if ((shadowIndex == -1 || shadowIndex >=forwardAutoIndexRight)
+                            && backShadowIndex <= backAutoIndexRight
+                            && (backAutoIndexRight == -1 || mRoad[i + 1, backAutoIndexRight].Speed - MaxAcceleration < backSpeedRight) 
+                            && speedRight >= speed)
+                        {
+                            canMoveRight = true;
+                        }
                     }
-                    
-                    
-                    
-                    int len = mRoad[i, j].Type == AutoType.Bus ? BusLength : CarLength;
-                    mRoad2[i, j + mRoad[i,j].Speed].isFirst = true;
-                    mRoad2[i, j + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
-                    mRoad2[i, j + mRoad[i, j].Speed].Speed = speed;
-                    for (int k = j - 1; k >= j - len + 1; k--)
+
+                    var changeP = random.NextDouble();
+                    if (canMoveLeft && canMoveRight)
                     {
-                        mRoad2[i, k + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
-                        mRoad2[i, k + mRoad[i, j].Speed].Speed = speed;
+                        if (changeP < ChangeRowProbability / 2)                        
+                            MoveAuto(i, j, speed, i - 1);                        
+                        else if (changeP < ChangeRowProbability)                        
+                            MoveAuto(i, j, speed, i + 1);                        
+                        else                        
+                            MoveAuto(i, j, speed, i);                        
                     }
+                    else if (canMoveLeft)
+                    {
+                        if (changeP < ChangeRowProbability / 2)                        
+                            MoveAuto(i, j, speed, i - 1);                        
+                        else                        
+                            MoveAuto(i, j, speed, i);                        
+                    }
+                    else if (canMoveRight)
+                    {
+                        if (changeP < ChangeRowProbability / 2)                        
+                            MoveAuto(i, j, speed, i + 1);                        
+                        else                        
+                            MoveAuto(i, j, speed, i);
+                    }
+                    else
+                        MoveAuto(i, j, speed, i);
                 }
             }
             for (int i = 0; i < RowCount; i++)
@@ -124,11 +210,30 @@ namespace PractiseVisualizer
                     mRoad[i, j].isFirst = mRoad2[i, j].isFirst;
                     mRoad[i, j].Speed = mRoad2[i, j].Speed;
                     mRoad[i, j].Type = mRoad2[i, j].Type;
+                    mRoad[i, j].ManCount = mRoad2[i, j].ManCount;
                     mRoad2[i,j] = new Cell();
                 }
             }
+            
             NextTime();
             
+        }
+
+        int changedRowCount;
+        void MoveAuto(int i, int j,int speed,int newI)
+        {
+            if (i != newI)
+                changedRowCount++;
+            int len = mRoad[i, j].Type == AutoType.Bus ? BusLength : CarLength;
+            mRoad2[newI, j + mRoad[i, j].Speed].isFirst = true;
+            mRoad2[newI, j + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
+            mRoad2[newI, j + mRoad[i, j].Speed].Speed = speed;
+            mRoad2[newI, j + mRoad[i, j].Speed].ManCount = mRoad[i, j].ManCount;
+            for (int k = j - 1; k >= j - len + 1; k--)
+            {
+                mRoad2[newI, k + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
+                mRoad2[newI, k + mRoad[i, j].Speed].Speed = speed;                
+            } 
         }
 
         void NextTime()
@@ -203,20 +308,20 @@ namespace PractiseVisualizer
                 return Math.Min(speed+MaxAcceleration,maxSafeSeed);
             }            
         }
-        int SearchBackAuto(int i, int j)
+        int SearchBackAuto(Cell[,] road,int i, int j)
         {
             for (int k = j - 1; k >= 0; k--)
             {
-                if (mRoad[i, k].Type == AutoType.Car || mRoad[i,k].Type == AutoType.Bus)
+                if (road[i, k].Type == AutoType.Car || road[i,k].Type == AutoType.Bus)
                     return k;
             }
             return -1;
         }
-        int SearchForwardAuto(int i, int j)
+        int SearchForwardAuto(Cell[,] road,int i, int j)
         {                       
             for (int k = j + 1; k < RoadLength; k++)
             {
-                if (mRoad[i, k].Type != AutoType.None)
+                if (road[i, k].Type != AutoType.None)
                     return k;
             }
             return -1;
@@ -235,6 +340,8 @@ namespace PractiseVisualizer
                         {
                             mRoad[i, BusLength-1].Type = AutoType.Bus;
                             mRoad[i, BusLength-1].isFirst = true;
+                            mRoad[i, BusLength - 1].ManCount = random.Next(MaxBusCapacity + 1);
+                            addedMen += mRoad[i, BusLength - 1].ManCount;
                             for (int j = BusLength - 2; j >= 0; j--)
                             {
                                 mRoad[i, j].Type = AutoType.Bus;
@@ -242,8 +349,10 @@ namespace PractiseVisualizer
                         }
                         else if (p < NewVehicleProbability)
                         {
-                            mRoad[i, BusLength-1].Type = AutoType.Car;
+                            mRoad[i, BusLength - 1].Type = AutoType.Car;
                             mRoad[i, BusLength - 1].isFirst = true;
+                            mRoad[i, BusLength - 1].ManCount = random.Next(MaxCarCapacity + 1);
+                            addedMen += mRoad[i, BusLength - 1].ManCount;
                             for (int j = BusLength - 2; j >= BusLength - CarLength; j--)
                             {
                                 mRoad[i, j].Type = AutoType.Car;
