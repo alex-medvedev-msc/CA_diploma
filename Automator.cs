@@ -17,7 +17,7 @@ namespace PractiseVisualizer
         public int CarLength { get; set; }
         public int MaxBusCapacity { get; set; }
         public int MaxCarCapacity { get; set; }
-        public int AverageTimeOnStation { get; set; }
+        
         public int MaxAcceleration { get; set; }
                 
         public double NewVehicleProbability { get; set; }
@@ -29,6 +29,13 @@ namespace PractiseVisualizer
         public int RedInterval { get; set; }
         public int GreenIntervalAtEnd { get; set; }
         public int RedIntervalAtEnd { get; set; }
+
+        public int StationStart { get; set; }
+        public int StationEnd { get; set; }
+        public int AverageTimeOnStation { get; set; }
+        public bool NeedTrouble { get; set; }
+
+
         Cell[,] mRoad;
         Cell[,] mRoad2;
         public Cell[,] Cells
@@ -91,8 +98,12 @@ namespace PractiseVisualizer
         {
             return carsFlow;
         }
-        #endregion
+        public double GetAverageTotalFlow()
+        {
+            return this.GetAverageSpeed() * this.GetDensity();
+        }
 
+        #endregion
 
         public void Init()
         {
@@ -106,6 +117,8 @@ namespace PractiseVisualizer
                     mRoad2[i, j] = new Cell();
                 }
             }
+            if (NeedTrouble)
+                AddParkedCars();
             IsTrafficLightGreen = true;
             IsTrafficLightGreenAtEnd = false;
             EnableTrafficLightAtIndex(RoadLength - 1, true);
@@ -134,6 +147,37 @@ namespace PractiseVisualizer
                         carsFlow++;
                         continue;
                     }
+                    if (j > StationStart / 2 && j <= StationEnd && mRoad[i,j].Type == AutoType.Bus)
+                    {
+                        if (i > 0)
+                        {
+                            var busBackAutoIndexLeft = SearchBackAuto(mRoad, i - 1, j);
+                            var busBackSpeedLeft = SanitizeSpeed(i - 1, busBackAutoIndexLeft, j);
+                            var busForwardAutoIndexLeft = SearchForwardAuto(mRoad, i - 1, j);
+                            var forwardSpeedLeft = SanitizeSpeed(i, j, busForwardAutoIndexLeft);
+                            if ((busBackAutoIndexLeft == -1 ||
+                                mRoad[i - 1, busBackAutoIndexLeft].Speed - MaxAcceleration < busBackSpeedLeft)
+                                &&forwardSpeedLeft >= Math.Max(mRoad[i,j].Speed - MaxAcceleration,0))
+                            {
+                                var busSpeed = SanitizeBusSpeed(i, j, StationEnd);
+                                if (busForwardAutoIndexLeft != -1 && busForwardAutoIndexLeft < StationEnd)
+                                    busSpeed = SanitizeBusSpeed(i, j, busForwardAutoIndexLeft);
+                                GeneralMoveBus(i, j, busSpeed, false, true);
+                            }
+                        }
+                        else
+                        {
+                            var busForwardAutoIndex = SearchForwardAuto(mRoad, i, j);
+                            var busSpeed = SanitizeBusSpeed(i, j, StationEnd);
+                            if (busForwardAutoIndex != -1 && busForwardAutoIndex < StationEnd)
+                                busSpeed = SanitizeSpeed(i, j, busForwardAutoIndex);
+                            GeneralMoveBus(i, j, busSpeed, false, false);
+                        }
+                        continue;
+                    }
+
+
+
                     var forwardAutoIndex = SearchForwardAuto(mRoad,i, j);
                     int speed = SanitizeSpeed(i, j, forwardAutoIndex);
                     var forwardAutoIndexLeft = j+1; 
@@ -181,34 +225,11 @@ namespace PractiseVisualizer
                         }
                     }
 
-                    var changeP = random.NextDouble();
-                    if (canMoveLeft && canMoveRight)
-                    {
-                        if (changeP < ChangeRowProbability / 2)                        
-                            MoveAuto(i, j, speed, i - 1);                        
-                        else if (changeP < ChangeRowProbability)                        
-                            MoveAuto(i, j, speed, i + 1);                        
-                        else                        
-                            MoveAuto(i, j, speed, i);                        
-                    }
-                    else if (canMoveLeft)
-                    {
-                        if (changeP < ChangeRowProbability / 2)                        
-                            MoveAuto(i, j, speed, i - 1);                        
-                        else                        
-                            MoveAuto(i, j, speed, i);                        
-                    }
-                    else if (canMoveRight)
-                    {
-                        if (changeP < ChangeRowProbability / 2)                        
-                            MoveAuto(i, j, speed, i + 1);                        
-                        else                        
-                            MoveAuto(i, j, speed, i);
-                    }
-                    else
-                        MoveAuto(i, j, speed, i);
+                    GeneralRandomizedMoveAuto(canMoveLeft, canMoveRight, i, j, speed);
                 }
             }
+
+            //Copy road back
             for (int i = 0; i < RowCount; i++)
             {
                 for (int j = 0; j < RoadLength; j++)
@@ -217,6 +238,7 @@ namespace PractiseVisualizer
                     mRoad[i, j].Speed = mRoad2[i, j].Speed;
                     mRoad[i, j].Type = mRoad2[i, j].Type;
                     mRoad[i, j].ManCount = mRoad2[i, j].ManCount;
+                    mRoad[i, j].StationLimit = mRoad2[i, j].StationLimit;
                     mRoad2[i,j] = new Cell();
                 }
             }
@@ -224,6 +246,94 @@ namespace PractiseVisualizer
             NextTime();
             
         }
+
+        void AddParkedCars()
+        {
+            for (int k = RoadLength / 2; k < RoadLength - 1; k += 2)
+            {
+                mRoad[RowCount - 1, k].Type = AutoType.Trouble;
+            }
+        }
+
+        //Вызывается только до и во время остановки, после используется функция для движения автомобиля
+        void GeneralMoveBus(int i, int j, int speed, bool canMoveRight, bool canMoveLeft)
+        {
+            if (j >= StationStart && j <= StationEnd)
+            {
+                if (mRoad[i, j].StationLimit > 0)
+                {
+                    mRoad[i, j].StationLimit--;
+                }
+                else
+                {
+                    if (canMoveLeft)
+                        MoveAuto(i, j, speed, i - 1);
+                    else
+                        MoveAuto(i, j, speed, i);
+                }
+            }
+            else
+            {
+                if (canMoveRight)
+                {
+                    MoveAuto(i, j, speed, i + 1);
+                }
+                else
+                {
+                    MoveAuto(i, j, speed, i);
+                }  
+            }                      
+        }
+
+        int SanitizeBusSpeed(int i, int j, int forwardAutoIndex)
+        {
+            if (j == -1)
+            {
+                return Math.Min(MaxSpeed, 0 + MaxAcceleration);
+            }
+            int speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + MaxAcceleration);
+            if (forwardAutoIndex != -1)
+            {
+                speed = GetSpeed(forwardAutoIndex - j - 1, mRoad[i, j].Speed, 0);
+                if (speed > mRoad[i, j].Speed + MaxAcceleration || speed > MaxSpeed)
+                    speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + MaxAcceleration);
+            }
+            return speed;
+        }
+        void GeneralRandomizedMoveAuto(bool canMoveLeft, bool canMoveRight,int i, int j, int speed)
+        {
+            var changeP = random.NextDouble();
+            if (mRoad[i, j].Type == AutoType.Bus && j >= StationStart/2 && j <= StationStart)
+            {
+                MoveAuto(i, j, speed, i - 1);
+            }
+            if (canMoveLeft && canMoveRight)
+            {
+                if (changeP < ChangeRowProbability / 2)
+                    MoveAuto(i, j, speed, i - 1);
+                else if (changeP < ChangeRowProbability)
+                    MoveAuto(i, j, speed, i + 1);
+                else
+                    MoveAuto(i, j, speed, i);
+            }
+            else if (canMoveLeft)
+            {
+                if (changeP < ChangeRowProbability / 2)
+                    MoveAuto(i, j, speed, i - 1);
+                else
+                    MoveAuto(i, j, speed, i);
+            }
+            else if (canMoveRight)
+            {
+                if (changeP < ChangeRowProbability / 2)
+                    MoveAuto(i, j, speed, i + 1);
+                else
+                    MoveAuto(i, j, speed, i);
+            }
+            else
+                MoveAuto(i, j, speed, i); 
+        }
+
 
         int changedRowCount;
         void MoveAuto(int i, int j,int speed,int newI)
@@ -235,6 +345,7 @@ namespace PractiseVisualizer
             mRoad2[newI, j + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
             mRoad2[newI, j + mRoad[i, j].Speed].Speed = speed;
             mRoad2[newI, j + mRoad[i, j].Speed].ManCount = mRoad[i, j].ManCount;
+            mRoad2[newI, j + mRoad[i, j].Speed].StationLimit = mRoad[i, j].StationLimit;
             for (int k = j - 1; k >= j - len + 1; k--)
             {
                 mRoad2[newI, k + mRoad[i, j].Speed].Type = mRoad[i, j].Type;

@@ -12,6 +12,7 @@ namespace PractiseVisualizer
         public int Speed { get; set; }
         public bool isFirst { get; set; }
         public int ManCount { get; set; }
+        public int StationLimit { get; set; }
     }
     public enum AutoType
     {

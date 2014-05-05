@@ -47,10 +47,11 @@ namespace PractiseVisualizer
                 GreenInterval = 100,
                 RedInterval = 20,
                 GreenIntervalAtEnd = 50,
-                RedIntervalAtEnd = 20,
+                RedIntervalAtEnd = 40,
                 ChangeRowProbability = 1,
                 MaxBusCapacity = 70,
-                MaxCarCapacity = 5
+                MaxCarCapacity = 5,
+                NeedTrouble = true
             });
                 automators[i].Init();
             }
@@ -61,32 +62,35 @@ namespace PractiseVisualizer
                 BusLength=12,
                 CarLength=5,
                 RowCount=4,
-                RoadLength=400,
+                RoadLength=100,
                 MaxAcceleration=2,
                 MaxSpeed = 11,
                 GreenInterval = 70,
                 RedInterval = 70,
                 GreenIntervalAtEnd = 30,
                 RedIntervalAtEnd = 30,
-                ChangeRowProbability = 0.5
+                ChangeRowProbability = 1,
+                StationStart = 40,
+                StationEnd = 80
             };
             automator.Init();
             var model = new PlotModel();
             Road.Model = model;
+            //PlotFundamentalDiagram();
             //PlotRowChanges();
-            //PlotManFlow();
-            PlotSpeedAndDensity();
-            WriteToPngFile("speed and density_4 rows.png");
+           // PlotDensityAndChangeRows();
+            //PlotSpeedAndDensity();
+            //WriteToPngFile("s.png");
             //PlotSpeed();
             //PlotDensity();
-            /*
+            
             var timer = new Timer(2000);
             timer.Elapsed += timer_Elapsed;
             Task.Factory.StartNew(() =>
                 {                    
                     timer.Start();
                 });
-            */
+            
         }
 
         void WriteToPngFile(string fileName)
@@ -116,8 +120,56 @@ namespace PractiseVisualizer
 
         void PlotFundamentalDiagram()
         {
+            var points = new ScatterSeries();
 
+            for (int i = 0; i < 200; i++)
+            {
+                var densities = new List<double>();
+                var flows = new List<double>();
+                foreach (var ar in automators)
+                {
+                    ar.Iterate();
+                    if (i < 20)
+                        continue;
+                    densities.Add(ar.GetDensity());
+                    flows.Add(ar.GetAverageTotalFlow());
+                }
+                if (i >= 20)
+                    points.Points.Add(new ScatterPoint(densities.Average(), flows.Average(), 1.5));
+            }
+            Road.Model.Series.Add(points);
+
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Плотность") { TitleFontSize = 20 });
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Left, "Поток") { TitleFontSize = 20 });
+            Road.Model.RefreshPlot(true);  
         }
+
+        void PlotDensityAndChangeRows()
+        {                       
+            var points = new ScatterSeries();
+                        
+            for (int i = 0; i < 200; i++)
+            {
+                var densities = new List<double>();
+                var changeRows = new List<double>();
+                foreach (var ar in automators)
+                {
+                    ar.Iterate();
+                    if (i < 20)
+                        continue;
+                    densities.Add(ar.GetDensity());
+                    changeRows.Add(ar.GetChangedRowPart());                    
+                }
+                if (i >= 20)
+                    points.Points.Add(new ScatterPoint(densities.Average(), changeRows.Average(),1.5));
+            }           
+            Road.Model.Series.Add(points);
+
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Плотность") { TitleFontSize = 20 });
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Left, "Доля перестроившихся машин") { TitleFontSize = 20 });
+            Road.Model.RefreshPlot(true);
+        }
+
         const int MAX_ITERATIONS = 100;
         void PlotManFlow()
         {
