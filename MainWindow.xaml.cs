@@ -57,21 +57,23 @@ namespace PractiseVisualizer
             }
             automator = new Automator() 
             {
-                NewVehicleProbability = 0.6,
-                BusQuota=0.2,
-                BusLength=12,
-                CarLength=5,
-                RowCount=4,
-                RoadLength=100,
-                MaxAcceleration=2,
+                NewVehicleProbability = 1,
+                BusQuota = 0.2,
+                BusLength = 12,
+                CarLength = 5,
+                RowCount = 4,
+                RoadLength = 100,
+                MaxAcceleration = 2,
                 MaxSpeed = 11,
-                GreenInterval = 70,
-                RedInterval = 70,
-                GreenIntervalAtEnd = 30,
-                RedIntervalAtEnd = 30,
+                GreenInterval = 100,
+                RedInterval = 20,
+                GreenIntervalAtEnd = 50,
+                RedIntervalAtEnd = 40,
                 ChangeRowProbability = 1,
-                StationStart = 40,
-                StationEnd = 80
+                MaxBusCapacity = 70,
+                MaxCarCapacity = 5,
+                D1 = 2,
+                K = 4
             };
             automator.Init();
             var model = new PlotModel();
@@ -83,14 +85,31 @@ namespace PractiseVisualizer
             //WriteToPngFile("s.png");
             //PlotSpeed();
             //PlotDensity();
-            
+
+            NextIteration.Click += NextIteration_Click;
+            var speeds = new int[]
+            {
+                automator.GetSpeed(0,1,1),
+                automator.GetSpeed(0,0,0),
+                automator.GetSpeed(0,0,5),
+                automator.GetSpeed(2,1,1),
+                automator.GetSpeed(5,2,0)
+            };
             var timer = new Timer(2000);
             timer.Elapsed += timer_Elapsed;
             Task.Factory.StartNew(() =>
                 {                    
-                    timer.Start();
-                });
-            
+                    //timer.Start();
+                });            
+        }
+
+        void NextIteration_Click(object sender, RoutedEventArgs e)
+        {
+            automator.Iterate();
+            Dispatcher.Invoke(() =>
+            {
+                PlotRoad(automator.Cells);
+            });
         }
 
         void WriteToPngFile(string fileName)

@@ -3,8 +3,23 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:oxy="http://oxyplot.codeplex.com"
         xmlns:local="clr-namespace:PractiseVisualizer"
-        Title="Vizualizer" Height="300" Width="1000">
-    <Grid>
-        <oxy:Plot Name="Road"/>
+        Title="Vizualizer" Height="450" Width="1000">
+    <Grid>        
+        <Grid.RowDefinitions >
+            <RowDefinition Height="300"/>
+            <RowDefinition Height="100"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="1000"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        
+        <oxy:Plot Name="Road" Grid.Column="0" Grid.Row="0"/>
+        <Button Name="NextIteration" 
+                Content="Следующая итерация"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="200"
+                Height="50"
+                Grid.Column="0" Grid.Row="1"/>
     </Grid>
 </Window>

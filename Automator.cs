@@ -149,6 +149,7 @@ namespace PractiseVisualizer
                     }
                     if (j > StationStart / 2 && j <= StationEnd && mRoad[i,j].Type == AutoType.Bus)
                     {
+                        continue;
                         if (i > 0)
                         {
                             var busBackAutoIndexLeft = SearchBackAuto(mRoad, i - 1, j);
@@ -175,8 +176,7 @@ namespace PractiseVisualizer
                         }
                         continue;
                     }
-
-
+                    
 
                     var forwardAutoIndex = SearchForwardAuto(mRoad,i, j);
                     int speed = SanitizeSpeed(i, j, forwardAutoIndex);
@@ -197,12 +197,14 @@ namespace PractiseVisualizer
                         backSpeedLeft = SanitizeSpeed(i - 1, backAutoIndexLeft, j);
                         if ((shadowIndex == -1 || shadowIndex >=forwardAutoIndexLeft) &&
                             backShadowIndex <= backAutoIndexLeft &&
-                            (backAutoIndexLeft == -1 || mRoad[i - 1, backAutoIndexLeft].Speed - MaxAcceleration < backSpeedLeft)  &&
+                            (backAutoIndexLeft == -1 || 
+                            mRoad[i - 1, backAutoIndexLeft].Speed - MaxAcceleration < backSpeedLeft)  &&
                             speedLeft >= speed)
                         {
                             canMoveLeft = true;
                         }
                     }
+                    canMoveLeft = false; //FIXME:
                     var forwardAutoIndexRight = j+1;
                     var backAutoIndexRight = j-1;
                     bool canMoveRight = false;
@@ -224,7 +226,7 @@ namespace PractiseVisualizer
                             canMoveRight = true;
                         }
                     }
-
+                    canMoveRight = false; //FIXME:
                     GeneralRandomizedMoveAuto(canMoveLeft, canMoveRight, i, j, speed);
                 }
             }
@@ -243,8 +245,7 @@ namespace PractiseVisualizer
                 }
             }
             
-            NextTime();
-            
+            NextTime();            
         }
 
         void AddParkedCars()
@@ -281,7 +282,7 @@ namespace PractiseVisualizer
                 else
                 {
                     MoveAuto(i, j, speed, i);
-                }  
+                }
             }                      
         }
 
@@ -300,13 +301,16 @@ namespace PractiseVisualizer
             }
             return speed;
         }
-        void GeneralRandomizedMoveAuto(bool canMoveLeft, bool canMoveRight,int i, int j, int speed)
+        void GeneralRandomizedMoveAuto(bool canMoveLeft, bool canMoveRight,
+                                        int i, int j, int speed)
         {
             var changeP = random.NextDouble();
-            if (mRoad[i, j].Type == AutoType.Bus && j >= StationStart/2 && j <= StationStart)
+            /*if (mRoad[i, j].Type == AutoType.Bus && 
+                j >= StationStart/2 &&
+                j <= StationStart)
             {
                 MoveAuto(i, j, speed, i - 1);
-            }
+            }*/
             if (canMoveLeft && canMoveRight)
             {
                 if (changeP < ChangeRowProbability / 2)
@@ -350,7 +354,7 @@ namespace PractiseVisualizer
             {
                 mRoad2[newI, k + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
                 mRoad2[newI, k + mRoad[i, j].Speed].Speed = speed;                
-            } 
+            }
         }
 
         void NextTime()
@@ -396,34 +400,36 @@ namespace PractiseVisualizer
 
         int SanitizeSpeed(int i, int j, int forwardAutoIndex)
         {
-            if (j == -1)
-            {
+            if (j == -1)            
                 return Math.Min(MaxSpeed, mRoad[i, forwardAutoIndex].Speed + MaxAcceleration);
-            }
+            
             int speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + MaxAcceleration);
-            if (forwardAutoIndex != -1)
-            {
-                speed = GetSpeed(forwardAutoIndex - j - 1, mRoad[i, j].Speed, mRoad[i, forwardAutoIndex].Speed);
-                if (speed > mRoad[i, j].Speed + MaxAcceleration || speed > MaxSpeed)
-                    speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + MaxAcceleration);
-            }
+            if (forwardAutoIndex != -1)            
+                speed = GetSpeed(forwardAutoIndex - j - 1, mRoad[i, j].Speed, 
+                                    mRoad[i, forwardAutoIndex].Speed);
+            
+           // if (speed > forwardAutoIndex - j - 1)
+               // throw new ArgumentException("speed exception: speed = " + speed
+                 //   + " i = " + i + " j = " + j + " distance = " + (forwardAutoIndex - j - 1));
             return speed;
         }
-        
-        int GetSpeed(int distance, int speed, int speedOfForwardAuto)
+        public int K { get; set; }
+        public int D1 { get; set; }
+        public int GetSpeed(int distance, int speed, int speedOfForwardAuto)
         {
-            int sum = ((speedOfForwardAuto + speedOfForwardAuto % MaxAcceleration) * (speedOfForwardAuto/2 + 1)) / 2 + distance;
-            int t = speed%MaxAcceleration;
-            double sqr = Math.Sqrt(Math.Pow(MaxAcceleration+t,2)-4*MaxAcceleration*(t-2*sum));
-            int maxSafeSeed = (int)Math.Floor((sqr-MaxAcceleration-t)/2);
-            if (maxSafeSeed <= speed)
+            var syncDistance = D1 + K * speed;
+            if (distance <= syncDistance)
             {
-                return Math.Max(maxSafeSeed - MaxAcceleration,0);
+                var delta = speedOfForwardAuto - speed;
+                if (delta > 0)
+                    return Math.Min(MaxSpeed, speed + Math.Min(MaxAcceleration, delta));
+                else
+                    return Math.Max(0,speed + Math.Max(-MaxAcceleration, delta));
             }
             else
             {
-                return Math.Min(speed+MaxAcceleration,maxSafeSeed);
-            }            
+                return Math.Min(MaxSpeed, speed + random.Next(MaxAcceleration) + 1);
+            }
         }
         int SearchBackAuto(Cell[,] road,int i, int j)
         {
@@ -432,10 +438,11 @@ namespace PractiseVisualizer
                 if (road[i, k].Type == AutoType.Car || road[i,k].Type == AutoType.Bus)
                     return k;
             }
+            
             return -1;
         }
         int SearchForwardAuto(Cell[,] road,int i, int j)
-        {                       
+        {           
             for (int k = j + 1; k < RoadLength; k++)
             {
                 if (road[i, k].Type != AutoType.None)
