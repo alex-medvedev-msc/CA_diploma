@@ -140,13 +140,7 @@ namespace PractiseVisualizer
                     if (!mRoad[i, j].isFirst)
                     {
                         continue; 
-                    }
-                    if (j + mRoad[i, j].Speed >= RoadLength)
-                    {
-                        removedMen += mRoad[i, j].ManCount;
-                        carsFlow++;
-                        continue;
-                    }
+                    }                    
                     if (j > StationStart / 2 && j <= StationEnd && mRoad[i,j].Type == AutoType.Bus)
                     {
                         continue;
@@ -175,8 +169,7 @@ namespace PractiseVisualizer
                             GeneralMoveBus(i, j, busSpeed, false, false);
                         }
                         continue;
-                    }
-                    
+                    }                    
 
                     var forwardAutoIndex = SearchForwardAuto(mRoad,i, j);
                     int speed = SanitizeSpeed(i, j, forwardAutoIndex);
@@ -187,7 +180,8 @@ namespace PractiseVisualizer
                     int backSpeedLeft = 0;
                     int backSpeedRight = 0;
                     bool canMoveLeft = false;
-                    if (i > 0)
+                    var length = mRoad[i,j].Type == AutoType.Bus ? BusLength : CarLength;
+                    if (i > 0 && CheckLane(i-1,j,length))
                     {
                         forwardAutoIndexLeft = SearchForwardAuto(mRoad,i - 1, j);
                         var shadowIndex = SearchForwardAuto(mRoad2, i - 1, j);                        
@@ -195,20 +189,21 @@ namespace PractiseVisualizer
                         var backShadowIndex = SearchBackAuto(mRoad2, i - 1, j);
                         speedLeft = SanitizeSpeed(i - 1, j, forwardAutoIndexLeft);                        
                         backSpeedLeft = SanitizeSpeed(i - 1, backAutoIndexLeft, j);
-                        if ((shadowIndex == -1 || shadowIndex >=forwardAutoIndexLeft) &&
+                        
+                        if ((shadowIndex == -1 || shadowIndex >= forwardAutoIndexLeft) &&
                             backShadowIndex <= backAutoIndexLeft &&
                             (backAutoIndexLeft == -1 || 
-                            mRoad[i - 1, backAutoIndexLeft].Speed - MaxAcceleration < backSpeedLeft)  &&
-                            speedLeft >= speed)
+                            mRoad[i - 1, backAutoIndexLeft].Speed <= backSpeedLeft)
+                            && speedLeft > speed)
                         {
                             canMoveLeft = true;
                         }
                     }
-                    canMoveLeft = false; //FIXME:
+                    //canMoveLeft = false; //FIXME:
                     var forwardAutoIndexRight = j+1;
                     var backAutoIndexRight = j-1;
                     bool canMoveRight = false;
-                    if (i < RowCount - 1)
+                    if (i < RowCount - 1 && CheckLane(i+1,j,length))
                     {
                         forwardAutoIndexRight = SearchForwardAuto(mRoad,i + 1, j);
                         var shadowIndex = SearchForwardAuto(mRoad2, i + 1, j);
@@ -218,15 +213,16 @@ namespace PractiseVisualizer
                         var backShadowIndex = SearchBackAuto(mRoad2, i + 1, j);
                         speedRight = SanitizeSpeed(i + 1, j, forwardAutoIndexRight);                        
                         backSpeedRight = SanitizeSpeed(i + 1, backAutoIndexRight, j);
-                        if ((shadowIndex == -1 || shadowIndex >=forwardAutoIndexRight)
+                        if ((shadowIndex == -1 || shadowIndex >= forwardAutoIndexRight)
                             && backShadowIndex <= backAutoIndexRight
-                            && (backAutoIndexRight == -1 || mRoad[i + 1, backAutoIndexRight].Speed - MaxAcceleration < backSpeedRight) 
-                            && speedRight >= speed)
+                            && (backAutoIndexRight == -1 ||
+                            mRoad[i + 1, backAutoIndexRight].Speed <= backSpeedRight) 
+                            && speedRight > speed)
                         {
                             canMoveRight = true;
                         }
                     }
-                    canMoveRight = false; //FIXME:
+                    //canMoveRight = false; //FIXME:
                     GeneralRandomizedMoveAuto(canMoveLeft, canMoveRight, i, j, speed);
                 }
             }
@@ -247,6 +243,17 @@ namespace PractiseVisualizer
             
             NextTime();            
         }
+
+        bool CheckLane(int i, int j, int len)
+        {
+            for (int k = j; k > j - len; k--)
+            {
+                if (mRoad[i, k].Type != AutoType.None)
+                    return false;
+            }
+            return true;
+        }
+        
 
         void AddParkedCars()
         {
@@ -311,26 +318,27 @@ namespace PractiseVisualizer
             {
                 MoveAuto(i, j, speed, i - 1);
             }*/
+            int leftRightSpeed = speed - 1 >= 0 ? speed - 1 : 0;
             if (canMoveLeft && canMoveRight)
             {
                 if (changeP < ChangeRowProbability / 2)
-                    MoveAuto(i, j, speed, i - 1);
+                    MoveAuto(i, j, leftRightSpeed, i - 1);
                 else if (changeP < ChangeRowProbability)
-                    MoveAuto(i, j, speed, i + 1);
+                    MoveAuto(i, j, leftRightSpeed, i + 1);
                 else
                     MoveAuto(i, j, speed, i);
             }
             else if (canMoveLeft)
             {
                 if (changeP < ChangeRowProbability / 2)
-                    MoveAuto(i, j, speed, i - 1);
+                    MoveAuto(i, j, leftRightSpeed, i - 1);
                 else
                     MoveAuto(i, j, speed, i);
             }
             else if (canMoveRight)
             {
                 if (changeP < ChangeRowProbability / 2)
-                    MoveAuto(i, j, speed, i + 1);
+                    MoveAuto(i, j, leftRightSpeed, i + 1);
                 else
                     MoveAuto(i, j, speed, i);
             }
@@ -344,16 +352,22 @@ namespace PractiseVisualizer
         {
             if (i != newI)
                 changedRowCount++;
+            if (j + speed >= RoadLength-1)
+            {
+                removedMen += mRoad[i, j].ManCount;
+                carsFlow++;
+                return;
+            } 
             int len = mRoad[i, j].Type == AutoType.Bus ? BusLength : CarLength;
-            mRoad2[newI, j + mRoad[i, j].Speed].isFirst = true;
-            mRoad2[newI, j + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
-            mRoad2[newI, j + mRoad[i, j].Speed].Speed = speed;
-            mRoad2[newI, j + mRoad[i, j].Speed].ManCount = mRoad[i, j].ManCount;
-            mRoad2[newI, j + mRoad[i, j].Speed].StationLimit = mRoad[i, j].StationLimit;
+            mRoad2[newI, j + speed].isFirst = true;
+            mRoad2[newI, j + speed].Type = mRoad[i, j].Type;
+            mRoad2[newI, j + speed].Speed = speed;
+            mRoad2[newI, j + speed].ManCount = mRoad[i, j].ManCount;
+            mRoad2[newI, j + speed].StationLimit = mRoad[i, j].StationLimit;
             for (int k = j - 1; k >= j - len + 1; k--)
             {
-                mRoad2[newI, k + mRoad[i, j].Speed].Type = mRoad[i, j].Type;
-                mRoad2[newI, k + mRoad[i, j].Speed].Speed = speed;                
+                mRoad2[newI, k + speed].Type = mRoad[i, j].Type;
+                mRoad2[newI, k + speed].Speed = speed;                
             }
         }
 
@@ -372,6 +386,7 @@ namespace PractiseVisualizer
                 IsTrafficLightGreen = true;
             }
             intervalDurationAtEnd++;
+            EnableTrafficLightAtIndex(RoadLength - 1, !IsTrafficLightGreenAtEnd);
             if (IsTrafficLightGreenAtEnd && intervalDurationAtEnd > GreenIntervalAtEnd)
             {
                 intervalDurationAtEnd = 0;
@@ -383,7 +398,7 @@ namespace PractiseVisualizer
                 intervalDurationAtEnd = 0;
                 IsTrafficLightGreenAtEnd = true;
                 EnableTrafficLightAtIndex(RoadLength - 1, false);
-            } 
+            }
         }
 
         void EnableTrafficLightAtIndex(int j,bool enabled)
@@ -424,7 +439,7 @@ namespace PractiseVisualizer
                 if (delta > 0)
                     return Math.Min(MaxSpeed, speed + Math.Min(MaxAcceleration, delta));
                 else
-                    return Math.Max(0,speed + Math.Max(-MaxAcceleration, delta));
+                    return Math.Max(0,speed + Math.Max(-MaxAcceleration, delta-1));
             }
             else
             {

@@ -57,7 +57,7 @@ namespace PractiseVisualizer
             }
             automator = new Automator() 
             {
-                NewVehicleProbability = 1,
+                NewVehicleProbability = 0.6,
                 BusQuota = 0.2,
                 BusLength = 12,
                 CarLength = 5,
@@ -72,7 +72,7 @@ namespace PractiseVisualizer
                 ChangeRowProbability = 1,
                 MaxBusCapacity = 70,
                 MaxCarCapacity = 5,
-                D1 = 2,
+                D1 = 1,
                 K = 4
             };
             automator.Init();
@@ -164,7 +164,7 @@ namespace PractiseVisualizer
         }
 
         void PlotDensityAndChangeRows()
-        {                       
+        {
             var points = new ScatterSeries();
                         
             for (int i = 0; i < 200; i++)
