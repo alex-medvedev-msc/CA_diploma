@@ -199,6 +199,7 @@ namespace PractiseVisualizer
                             canMoveLeft = true;
                         }
                     }
+                    //dummy comment
                     //canMoveLeft = false; //FIXME:
                     var forwardAutoIndexRight = j+1;
                     var backAutoIndexRight = j-1;
