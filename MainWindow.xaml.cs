@@ -64,9 +64,10 @@ namespace PractiseVisualizer
                 NewVehicleProbability = 0.3,
                 BusQuota = 0.2,
                 BusLength = 12,
+                AverageTimeOnStation = 30,
                 CarLength = 5,
                 RowCount = 4,
-                RoadLength = 100,
+                RoadLength = 200,
                 MaxAcceleration = 2,
                 MaxSpeed = 11,
                 GreenInterval = 100,
@@ -78,7 +79,9 @@ namespace PractiseVisualizer
                 MaxCarCapacity = 5,
                 D1 = 2,
                 K = 4,
-                NeedTrouble = true
+                NeedTrouble = false,
+                StationStart = 100,
+                StationEnd = 150
             };
             automator.Init();
             var model = new PlotModel();
