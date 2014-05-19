@@ -45,7 +45,7 @@ namespace PractiseVisualizer
                 return mRoad;
             }
         }
-        Random random;
+        public static Random random = new Random();
         int timeStep;
         int intervalDuration;
         int intervalDurationAtEnd;
@@ -122,7 +122,7 @@ namespace PractiseVisualizer
             IsTrafficLightGreen = true;
             IsTrafficLightGreenAtEnd = false;
             EnableTrafficLightAtIndex(RoadLength - 1, true);
-            random = new Random();            
+            //random = new Random();            
         }
         public void Iterate()
         {
@@ -157,7 +157,7 @@ namespace PractiseVisualizer
                                 var busSpeed = SanitizeBusSpeed(i, j, StationEnd);
                                 if (busForwardAutoIndexLeft != -1 && busForwardAutoIndexLeft < StationEnd)
                                     busSpeed = SanitizeBusSpeed(i, j, busForwardAutoIndexLeft);
-                                GeneralMoveBus(i, j, busSpeed, false, true);
+                                //GeneralMoveBus(i, j, busSpeed, false, true);
                             }
                         }
                         else
@@ -166,7 +166,7 @@ namespace PractiseVisualizer
                             var busSpeed = SanitizeBusSpeed(i, j, StationEnd);
                             if (busForwardAutoIndex != -1 && busForwardAutoIndex < StationEnd)
                                 busSpeed = SanitizeSpeed(i, j, busForwardAutoIndex);
-                            GeneralMoveBus(i, j, busSpeed, false, false);
+                            //GeneralMoveBus(i, j, busSpeed, false, false);
                         }
                         continue;
                     }                    
@@ -182,48 +182,42 @@ namespace PractiseVisualizer
                     bool canMoveLeft = false;
                     var length = mRoad[i,j].Type == AutoType.Bus ? BusLength : CarLength;
                     if (i > 0 && CheckLane(i-1,j,length))
-                    {
+                    {                        
                         forwardAutoIndexLeft = SearchForwardAuto(mRoad,i - 1, j);
-                        var shadowIndex = SearchForwardAuto(mRoad2, i - 1, j);                        
                         backAutoIndexLeft = SearchBackAuto(mRoad,i - 1, j);
-                        var backShadowIndex = SearchBackAuto(mRoad2, i - 1, j);
-                        speedLeft = SanitizeSpeed(i - 1, j, forwardAutoIndexLeft);                        
-                        backSpeedLeft = SanitizeSpeed(i - 1, backAutoIndexLeft, j);
-                        
-                        if ((shadowIndex == -1 || shadowIndex >= forwardAutoIndexLeft) &&
-                            backShadowIndex <= backAutoIndexLeft &&
-                            (backAutoIndexLeft == -1 || 
-                            mRoad[i - 1, backAutoIndexLeft].Speed <= backSpeedLeft)
-                            && speedLeft > speed)
+                        if (i==1 || 
+                            (i > 1 && CheckSignalOff(i - 2, backAutoIndexLeft, forwardAutoIndexLeft, LaneChange.Right)))
                         {
-                            canMoveLeft = true;
+                            speedLeft = SanitizeSpeed(i - 1, j, forwardAutoIndexLeft);
+                            backSpeedLeft = SanitizeSpeed(i - 1, backAutoIndexLeft, j);
+                            if ((backAutoIndexLeft == -1 ||
+                                mRoad[i - 1, backAutoIndexLeft].Speed <= backSpeedLeft)
+                                && speedLeft > speed)
+                            {
+                                canMoveLeft = true;
+                            }
                         }
                     }
-                    //dummy comment
-                    //canMoveLeft = false; //FIXME:
                     var forwardAutoIndexRight = j+1;
                     var backAutoIndexRight = j-1;
                     bool canMoveRight = false;
                     if (i < RowCount - 1 && CheckLane(i+1,j,length))
                     {
                         forwardAutoIndexRight = SearchForwardAuto(mRoad,i + 1, j);
-                        var shadowIndex = SearchForwardAuto(mRoad2, i + 1, j);
-                        if (shadowIndex == -1)
-                            shadowIndex = forwardAutoIndexRight;
                         backAutoIndexRight = SearchBackAuto(mRoad,i + 1, j);
-                        var backShadowIndex = SearchBackAuto(mRoad2, i + 1, j);
-                        speedRight = SanitizeSpeed(i + 1, j, forwardAutoIndexRight);                        
-                        backSpeedRight = SanitizeSpeed(i + 1, backAutoIndexRight, j);
-                        if ((shadowIndex == -1 || shadowIndex >= forwardAutoIndexRight)
-                            && backShadowIndex <= backAutoIndexRight
-                            && (backAutoIndexRight == -1 ||
-                            mRoad[i + 1, backAutoIndexRight].Speed <= backSpeedRight) 
-                            && speedRight > speed)
+                        if (i == RowCount - 2 || 
+                            (i < RowCount - 2 && CheckSignalOff(i + 2, backAutoIndexRight, forwardAutoIndexRight, LaneChange.Left)))
                         {
-                            canMoveRight = true;
+                            speedRight = SanitizeSpeed(i + 1, j, forwardAutoIndexRight);
+                            backSpeedRight = SanitizeSpeed(i + 1, backAutoIndexRight, j);
+                            if ((backAutoIndexRight == -1 ||
+                                mRoad[i + 1, backAutoIndexRight].Speed <= backSpeedRight)
+                                && speedRight > speed)
+                            {
+                                canMoveRight = true;
+                            }
                         }
-                    }
-                    //canMoveRight = false; //FIXME:
+                    }                   
                     GeneralRandomizedMoveAuto(canMoveLeft, canMoveRight, i, j, speed);
                 }
             }
@@ -238,11 +232,26 @@ namespace PractiseVisualizer
                     mRoad[i, j].Type = mRoad2[i, j].Type;
                     mRoad[i, j].ManCount = mRoad2[i, j].ManCount;
                     mRoad[i, j].StationLimit = mRoad2[i, j].StationLimit;
+                    mRoad[i, j].Signal = mRoad2[i, j].Signal;
                     mRoad2[i,j] = new Cell();
                 }
             }
             
             NextTime();            
+        }
+
+        bool CheckSignalOff(int i, int startJ, int endJ, LaneChange direction)
+        {
+            if (startJ == -1)
+                startJ = 0;
+            if (endJ == -1)
+                endJ = RoadLength - 1;
+            for (int k = startJ; k < endJ; k++)
+            {
+                if (mRoad[i, k].Signal == direction)
+                    return false;
+            }
+            return true;
         }
 
         bool CheckLane(int i, int j, int len)
@@ -258,12 +267,14 @@ namespace PractiseVisualizer
 
         void AddParkedCars()
         {
+            mRoad[RowCount - 1, K].Type = AutoType.Trouble;
+           // return;
             for (int k = RoadLength / 2; k < RoadLength - 1; k += 2)
             {
                 mRoad[RowCount - 1, k].Type = AutoType.Trouble;
             }
         }
-
+        /*
         //Вызывается только до и во время остановки, после используется функция для движения автомобиля
         void GeneralMoveBus(int i, int j, int speed, bool canMoveRight, bool canMoveLeft)
         {
@@ -293,7 +304,7 @@ namespace PractiseVisualizer
                 }
             }                      
         }
-
+        */
         int SanitizeBusSpeed(int i, int j, int forwardAutoIndex)
         {
             if (j == -1)
@@ -312,6 +323,7 @@ namespace PractiseVisualizer
         void GeneralRandomizedMoveAuto(bool canMoveLeft, bool canMoveRight,
                                         int i, int j, int speed)
         {
+            
             var changeP = random.NextDouble();
             /*if (mRoad[i, j].Type == AutoType.Bus && 
                 j >= StationStart/2 &&
@@ -323,33 +335,52 @@ namespace PractiseVisualizer
             if (canMoveLeft && canMoveRight)
             {
                 if (changeP < ChangeRowProbability / 2)
-                    MoveAuto(i, j, leftRightSpeed, i - 1);
+                {
+                    if (mRoad[i, j].Signal == LaneChange.Left)
+                        MoveAuto(i, j, leftRightSpeed, i - 1, LaneChange.None);
+                    else
+                        MoveAuto(i, j, speed, i, LaneChange.Left);
+                }
                 else if (changeP < ChangeRowProbability)
-                    MoveAuto(i, j, leftRightSpeed, i + 1);
+                {
+                    if (mRoad[i,j].Signal == LaneChange.Right)
+                        MoveAuto(i, j, leftRightSpeed, i + 1,LaneChange.None);
+                    else
+                        MoveAuto(i, j, speed, i, LaneChange.Right);
+                }
                 else
-                    MoveAuto(i, j, speed, i);
+                    MoveAuto(i, j, speed, i,LaneChange.None);
             }
             else if (canMoveLeft)
             {
                 if (changeP < ChangeRowProbability / 2)
-                    MoveAuto(i, j, leftRightSpeed, i - 1);
+                {
+                    if (mRoad[i, j].Signal == LaneChange.Left)
+                        MoveAuto(i, j, leftRightSpeed, i - 1, LaneChange.None);
+                    else
+                        MoveAuto(i, j, speed, i, LaneChange.Left);
+                }
                 else
-                    MoveAuto(i, j, speed, i);
+                    MoveAuto(i, j, speed, i,LaneChange.None);
             }
             else if (canMoveRight)
             {
                 if (changeP < ChangeRowProbability / 2)
-                    MoveAuto(i, j, leftRightSpeed, i + 1);
+                {
+                    if (mRoad[i, j].Signal == LaneChange.Right)
+                        MoveAuto(i, j, leftRightSpeed, i + 1, LaneChange.None);
+                    else
+                        MoveAuto(i, j, speed, i, LaneChange.Right);
+                }
                 else
-                    MoveAuto(i, j, speed, i);
+                    MoveAuto(i, j, speed, i,LaneChange.None);
             }
             else
-                MoveAuto(i, j, speed, i); 
+                MoveAuto(i, j, speed, i,LaneChange.None);
         }
-
-
+                
         int changedRowCount;
-        void MoveAuto(int i, int j,int speed,int newI)
+        void MoveAuto(int i, int j,int speed,int newI,LaneChange newSignal)
         {
             if (i != newI)
                 changedRowCount++;
@@ -365,10 +396,12 @@ namespace PractiseVisualizer
             mRoad2[newI, j + speed].Speed = speed;
             mRoad2[newI, j + speed].ManCount = mRoad[i, j].ManCount;
             mRoad2[newI, j + speed].StationLimit = mRoad[i, j].StationLimit;
+            mRoad2[newI, j + speed].Signal = newSignal;           
             for (int k = j - 1; k >= j - len + 1; k--)
             {
                 mRoad2[newI, k + speed].Type = mRoad[i, j].Type;
-                mRoad2[newI, k + speed].Speed = speed;                
+                mRoad2[newI, k + speed].Speed = speed;
+                mRoad2[newI, k + speed].Signal = newSignal;
             }
         }
 

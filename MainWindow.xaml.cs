@@ -28,36 +28,40 @@ namespace PractiseVisualizer
     {
         Automator automator;
         List<Automator> automators;
+        const int totalIterations = 400;
+        const int warmUpIterations = 50;
         public MainWindow()
         {
             InitializeComponent();
             automators = new List<Automator>();
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 50; i++)
             {
                 automators.Add(new Automator()
                     {
-                NewVehicleProbability = 1,
-                BusQuota=0.2,
-                BusLength=12,
-                CarLength=5,
-                RowCount=4,
-                RoadLength=400,
-                MaxAcceleration=2,
-                MaxSpeed = 11,
-                GreenInterval = 100,
-                RedInterval = 20,
-                GreenIntervalAtEnd = 50,
-                RedIntervalAtEnd = 40,
-                ChangeRowProbability = 1,
-                MaxBusCapacity = 70,
-                MaxCarCapacity = 5,
-                NeedTrouble = true
+                        NewVehicleProbability = 0.5,
+                        BusQuota = 0.1,
+                        BusLength = 12,
+                        CarLength = 5,
+                        RowCount = 4,
+                        RoadLength = 500,
+                        MaxAcceleration = 2,
+                        MaxSpeed = 11,
+                        GreenInterval = 2000,
+                        RedInterval = 1,
+                        GreenIntervalAtEnd = 2000,
+                        RedIntervalAtEnd = 1,
+                        ChangeRowProbability = 1,
+                        MaxBusCapacity = 70,
+                        MaxCarCapacity = 5,
+                        D1 = 1,
+                        K = 3,
+                        NeedTrouble = true
             });
                 automators[i].Init();
             }
             automator = new Automator() 
             {
-                NewVehicleProbability = 0.6,
+                NewVehicleProbability = 0.3,
                 BusQuota = 0.2,
                 BusLength = 12,
                 CarLength = 5,
@@ -72,17 +76,19 @@ namespace PractiseVisualizer
                 ChangeRowProbability = 1,
                 MaxBusCapacity = 70,
                 MaxCarCapacity = 5,
-                D1 = 1,
-                K = 4
+                D1 = 2,
+                K = 4,
+                NeedTrouble = true
             };
             automator.Init();
             var model = new PlotModel();
             Road.Model = model;
+            //PlotManFlow();
             //PlotFundamentalDiagram();
             //PlotRowChanges();
-           // PlotDensityAndChangeRows();
+            //PlotDensityAndChangeRows();
             //PlotSpeedAndDensity();
-            //WriteToPngFile("s.png");
+            //WriteToPngFile("new_densityChangeRows_trouble_nolight.png");
             //PlotSpeed();
             //PlotDensity();
 
@@ -139,25 +145,42 @@ namespace PractiseVisualizer
 
         void PlotFundamentalDiagram()
         {
-            var points = new ScatterSeries();
-
-            for (int i = 0; i < 200; i++)
+            var greenGreenPoints = new ScatterSeries();
+            var greenRedPoints = new ScatterSeries();
+            var redGreenPoints = new ScatterSeries();
+            var redRedPoints = new ScatterSeries();
+            greenGreenPoints.MarkerFill = OxyColors.DarkGreen;
+            greenRedPoints.MarkerFill = OxyColors.LightGreen;
+            redGreenPoints.MarkerFill = OxyColors.OrangeRed;
+            redRedPoints.MarkerFill = OxyColors.DarkRed;
+            for (int i = 0; i < totalIterations; i++)
             {
                 var densities = new List<double>();
                 var flows = new List<double>();
                 foreach (var ar in automators)
                 {
-                    ar.Iterate();
-                    if (i < 20)
+                    ar.Iterate();                    
+                    if (i < warmUpIterations)
                         continue;
                     densities.Add(ar.GetDensity());
                     flows.Add(ar.GetAverageTotalFlow());
                 }
-                if (i >= 20)
-                    points.Points.Add(new ScatterPoint(densities.Average(), flows.Average(), 1.5));
+                if (i >= warmUpIterations)
+                {
+                    if (automators[0].IsTrafficLightGreen && automators[0].IsTrafficLightGreenAtEnd)                    
+                        greenGreenPoints.Points.Add(new ScatterPoint(densities.Average(), flows.Average(), 2));
+                    else if (!automators[0].IsTrafficLightGreen && automators[0].IsTrafficLightGreenAtEnd)
+                        redGreenPoints.Points.Add(new ScatterPoint(densities.Average(), flows.Average(), 2));
+                    else if (!automators[0].IsTrafficLightGreen && !automators[0].IsTrafficLightGreenAtEnd)
+                        redRedPoints.Points.Add(new ScatterPoint(densities.Average(), flows.Average(), 2));
+                    else if (automators[0].IsTrafficLightGreen && !automators[0].IsTrafficLightGreenAtEnd)
+                        greenRedPoints.Points.Add(new ScatterPoint(densities.Average(), flows.Average(), 2));
+                    }
             }
-            Road.Model.Series.Add(points);
-
+            Road.Model.Series.Add(greenGreenPoints);
+            Road.Model.Series.Add(greenRedPoints);
+            Road.Model.Series.Add(redRedPoints);
+            Road.Model.Series.Add(redGreenPoints);
             Road.Model.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Плотность") { TitleFontSize = 20 });
             Road.Model.Axes.Add(new LinearAxis(AxisPosition.Left, "Поток") { TitleFontSize = 20 });
             Road.Model.RefreshPlot(true);  
@@ -167,20 +190,20 @@ namespace PractiseVisualizer
         {
             var points = new ScatterSeries();
                         
-            for (int i = 0; i < 200; i++)
+            for (int i = 0; i < totalIterations; i++)
             {
                 var densities = new List<double>();
                 var changeRows = new List<double>();
                 foreach (var ar in automators)
                 {
                     ar.Iterate();
-                    if (i < 20)
+                    if (i < warmUpIterations)
                         continue;
                     densities.Add(ar.GetDensity());
                     changeRows.Add(ar.GetChangedRowPart());                    
                 }
-                if (i >= 20)
-                    points.Points.Add(new ScatterPoint(densities.Average(), changeRows.Average(),1.5));
+                if (i >= warmUpIterations)
+                    points.Points.Add(new ScatterPoint(densities.Average(), changeRows.Average(),2));
             }           
             Road.Model.Series.Add(points);
 
@@ -189,7 +212,7 @@ namespace PractiseVisualizer
             Road.Model.RefreshPlot(true);
         }
 
-        const int MAX_ITERATIONS = 100;
+        const int MAX_ITERATIONS = 400;
         void PlotManFlow()
         {
             var points = new LineSeries("Man Flow");

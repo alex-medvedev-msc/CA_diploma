@@ -13,6 +13,13 @@ namespace PractiseVisualizer
         public bool isFirst { get; set; }
         public int ManCount { get; set; }
         public int StationLimit { get; set; }
+        public LaneChange Signal { get; set; }
+    }
+    public enum LaneChange
+    {
+        None,
+        Left,
+        Right
     }
     public enum AutoType
     {
