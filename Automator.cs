@@ -371,7 +371,7 @@ namespace PractiseVisualizer
         int SanitizeBusSpeed(int i, int j, int forwardAutoIndex)
         {
             if (j == -1)            
-                return Math.Min(MaxSpeed, 0 + MaxAcceleration);
+                return Math.Min(MaxSpeed, 0 + 1);
             if (forwardAutoIndex == -1 || forwardAutoIndex > StationStart)
             {
                 return GetSpeed(StationStart - j - 1, mRoad[i, j].Speed, 2);
@@ -510,18 +510,31 @@ namespace PractiseVisualizer
 
         int SanitizeSpeed(int i, int j, int forwardAutoIndex)
         {
-            if (j == -1)            
-                return Math.Min(MaxSpeed, mRoad[i, forwardAutoIndex].Speed + MaxAcceleration);
-            
-            int speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + MaxAcceleration);
-            if (forwardAutoIndex != -1)            
-                speed = GetSpeed(forwardAutoIndex - j - 1, mRoad[i, j].Speed, 
-                                    mRoad[i, forwardAutoIndex].Speed);
-            
-           // if (speed > forwardAutoIndex - j - 1)
-               // throw new ArgumentException("speed exception: speed = " + speed
-                 //   + " i = " + i + " j = " + j + " distance = " + (forwardAutoIndex - j - 1));
-            return speed;
+            if (j == -1)
+            {
+                if (mRoad[i,forwardAutoIndex].Type == AutoType.Car)
+                    return Math.Min(MaxSpeed, mRoad[i, forwardAutoIndex].Speed + MaxAcceleration);
+                else
+                    return Math.Min(MaxSpeed, mRoad[i, forwardAutoIndex].Speed + 1);
+            }
+            if (mRoad[i, j].Type == AutoType.Car)
+            {               
+                int speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + MaxAcceleration);
+                if (forwardAutoIndex != -1)
+                    speed = GetSpeed(forwardAutoIndex - j - 1, mRoad[i, j].Speed,
+                                        mRoad[i, forwardAutoIndex].Speed);
+                return speed;
+            }
+            else
+            {               
+                int speed = Math.Min(MaxSpeed, mRoad[i, j].Speed + 1);
+                if (forwardAutoIndex != -1)
+                    speed = GetSpeed(forwardAutoIndex - j - 1, mRoad[i, j].Speed,
+                                        mRoad[i, forwardAutoIndex].Speed);
+                if (speed > mRoad[i, j].Speed + 1)
+                    speed = mRoad[i, j].Speed + 1;
+                return speed;
+            }
         }
         public int K { get; set; }
         public int D1 { get; set; }
