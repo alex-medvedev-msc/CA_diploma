@@ -120,7 +120,7 @@ namespace PractiseVisualizer
             if (NeedTrouble)
                 AddParkedCars();
             IsTrafficLightGreen = true;
-            IsTrafficLightGreenAtEnd = false;
+            IsTrafficLightGreenAtEnd = true;
             EnableTrafficLightAtIndex(RoadLength - 1, true);
             stationSyncDistance = Math.Min((MaxSpeed + 1) * ((MaxSpeed + 1) / MaxAcceleration),StationStart);
             //random = new Random();            

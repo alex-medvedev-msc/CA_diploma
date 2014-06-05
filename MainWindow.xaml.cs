@@ -12,7 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-
+using System.Reflection;
 using OxyPlot.Series;
 using OxyPlot;
 using OxyPlot.Axes;
@@ -28,8 +28,8 @@ namespace PractiseVisualizer
     {
         Automator automator;
         List<Automator> automators;
-        const int totalIterations = 3600;
-        const int warmUpIterations = 180;
+        const int totalIterations = 1800;
+        const int warmUpIterations = 0;
         public MainWindow()
         {
             InitializeComponent();
@@ -39,8 +39,8 @@ namespace PractiseVisualizer
             {
                 automators.Add(new Automator()
                     {
-                        NewVehicleProbability = 0.5,
-                        BusQuota = 0,
+                        NewVehicleProbability = 1,
+                        BusQuota = 0.1,
                         BusLength = 12,
                         CarLength = 5,
                         AverageTimeOnStation = 120,
@@ -48,15 +48,15 @@ namespace PractiseVisualizer
                         RoadLength = 400,
                         MaxAcceleration = 2,
                         MaxSpeed = 11,
-                        GreenInterval = totalIterations,
-                        RedInterval = 1,
-                        GreenIntervalAtEnd = totalIterations,
-                        RedIntervalAtEnd = 1,
+                        GreenInterval = 80,
+                        RedInterval = 80,
+                        GreenIntervalAtEnd = 80,
+                        RedIntervalAtEnd = 80,
                         ChangeRowProbability = 1,
                         MaxBusCapacity = 60,
                         MaxCarCapacity = 6,
                         StationStart = 100,
-                        StationEnd = 200,
+                        StationEnd = 160,
                         D1 = 1,
                         K = 3,
                         NeedTrouble = false
@@ -90,12 +90,16 @@ namespace PractiseVisualizer
             automator.Init();
             var model = new PlotModel();
             Road.Model = model;
-            PlotManFlow();
+            //PlotManFlow();
             //PlotFundamentalDiagram();
             //PlotRowChanges();
             //PlotDensityAndChangeRows();
             //PlotSpeedAndDensity();
-            WriteToPngFile("manflow_nointervals_05newauto.png");
+            //PlotSpeedAndBusQuotaLevels();
+           // PlotSpeedAndBusQuota();
+            PlotSpeedAndChangeRowProbabilityLevels();
+
+            WriteToPngFile("speed_rowchange1");
             //PlotSpeed();
             //PlotDensity();
 
@@ -127,15 +131,23 @@ namespace PractiseVisualizer
 
         void WriteToPngFile(string fileName)
         {
-            const string directory = @"C:\Users\ag\Google Диск\Diplom\PracticeGraphs";
-            string path = System.IO.Path.Combine(directory, fileName);
+            const string directory = @"C:\Users\ag\Google Диск\Diplom\PracticeGraphsFinal";
+            string path = System.IO.Path.Combine(directory, fileName +".png");
+            string descriptionPath = System.IO.Path.Combine(directory, fileName + ".txt");
             using (var stream = System.IO.File.Create(path))
-            {
+            {                
                 var pngExporter = new OxyPlot.Wpf.PngExporter();
                 pngExporter.Export(Road.Model, stream);
             }
+            System.IO.File.WriteAllText(descriptionPath,GetContents(automators[0]));
         }
-
+        string GetContents(Automator auto)
+        {
+            var properties = auto.GetType().GetProperties();
+            var content = String.Join(Environment.NewLine, properties.Select(p =>
+                p.Name + " " + p.GetValue(auto).ToString()));
+            return content;
+        }
         int iterations = 0;
         void timer_Elapsed(object sender, ElapsedEventArgs e)
         {
@@ -149,6 +161,73 @@ namespace PractiseVisualizer
             iterations++;
         }
 
+
+        void PlotSpeedAndChangeRowProbabilityLevels()
+        {
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Вероятность перестроения") { TitleFontSize = 18 });
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Left, "Средняя скорость, м/с") { TitleFontSize = 18 });
+            Road.Model.Axes[0].AxisDistance = 10;
+            Road.Model.Axes[1].AxisDistance = 10;
+            PlotSpeedAndRowChange(OxyColors.Green);
+            foreach (var a in automators)
+            {
+                a.NeedTrouble = true;
+                a.Init();
+            }
+            PlotSpeedAndRowChange(OxyColors.Red); 
+        }
+
+        
+        void PlotSpeedAndBusQuotaLevels()
+        {
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Bottom, "Доля автобусов") { TitleFontSize = 18 });
+            Road.Model.Axes.Add(new LinearAxis(AxisPosition.Left, "Средняя скорость, м/с") { TitleFontSize = 18 });
+            Road.Model.Axes[0].AxisDistance = 10;
+            Road.Model.Axes[1].AxisDistance = 10;
+            PlotSpeedAndBusQuota(OxyColors.Green);
+            foreach (var a in automators)
+            {
+                a.NeedTrouble = true;
+                a.Init();
+            }
+            PlotSpeedAndBusQuota(OxyColors.Red);
+        }
+
+        void PlotSpeedAndRowChange(OxyColor color)
+        {
+            var points = new LineSeries("");
+            points.Color = color;
+            for (int i = 0; i < automators.Count; i++)
+            {
+                automators[i].ChangeRowProbability = (double)i / automators.Count;
+            }
+            var manFlowList = new double[automators.Count, totalIterations / 600 + 1];
+            for (int ai = 0; ai < automators.Count; ai++)
+            {
+                for (int i = 0; i < totalIterations; i++)
+                {
+                    automators[ai].Iterate();
+                    manFlowList[ai, i / 600] += automators[ai].GetAverageSpeed();
+                }
+            }
+            var averageManFlowList = new double[automators.Count];
+            for (int i = 0; i < manFlowList.GetLength(0); i++)
+            {
+                double average = 0;
+                for (int j = 0; j < manFlowList.GetLength(1); j++)
+                {
+                    average += manFlowList[i, j];
+                }
+                averageManFlowList[i] = average / manFlowList.GetLength(1);
+            }
+            for (int i = 0; i < averageManFlowList.Length; i++)
+            {
+                points.Points.Add(new DataPoint((double)i / averageManFlowList.Length, averageManFlowList[i] / totalIterations));
+            }
+
+            Road.Model.Series.Add(points);
+            Road.Model.RefreshPlot(true);    
+        }
 
         void PlotFundamentalDiagram()
         {
@@ -319,6 +398,43 @@ namespace PractiseVisualizer
             Road.Model.RefreshPlot(true);
         }
 
+        void PlotSpeedAndBusQuota(OxyColor color)
+        {
+            var points = new LineSeries("");
+            points.Color = color;
+            for (int i = 0; i < automators.Count; i++)
+            {
+                automators[i].BusQuota = (double)i / automators.Count;
+            }
+            var manFlowList = new double[automators.Count, totalIterations / 600 + 1];
+            for (int ai = 0; ai < automators.Count; ai++)
+            {
+                for (int i = 0; i < totalIterations; i++)
+                {
+                    automators[ai].Iterate();
+                    manFlowList[ai, i / 600] += automators[ai].GetAverageSpeed();
+                }
+            }
+            var averageManFlowList = new double[automators.Count];
+            for (int i = 0; i < manFlowList.GetLength(0); i++)
+            {
+                double average = 0;
+                for (int j = 0; j < manFlowList.GetLength(1); j++)
+                {
+                    average += manFlowList[i, j];
+                }
+                averageManFlowList[i] = average / manFlowList.GetLength(1);
+            }
+            for (int i = 0; i < averageManFlowList.Length; i++)
+            {
+                points.Points.Add(new DataPoint((double)i / averageManFlowList.Length, averageManFlowList[i]/totalIterations));
+            }
+            
+            
+            Road.Model.Series.Add(points);
+            Road.Model.RefreshPlot(true);   
+        }
+
         void PlotSpeed()
         {
             var points = new LineSeries("Speed");
@@ -376,6 +492,6 @@ namespace PractiseVisualizer
             }           
             Road.Model.Series.Add(series);
             Road.Model.RefreshPlot(true);
-        }
+        }    
     }
 }
